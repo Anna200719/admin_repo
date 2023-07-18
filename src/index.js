@@ -8,12 +8,10 @@ const app = express()
 
 app.use(bodyParser.json({limit: "10mb"}))
 
-// Utility function to calculate the holding value
 const calculateHoldingValue = (investmentTotal, investmentPercentage) => {
   return investmentTotal * investmentPercentage
 }
 
-// Utility function to aggregate user holdings
 const aggregateUserHoldings = (investments, companies, userId) => {
   const userHoldings = {}
 
@@ -35,7 +33,6 @@ const aggregateUserHoldings = (investments, companies, userId) => {
   return userHoldings
 }
 
-// Generate CSV data from user holdings
 const generateCSVData = (userHoldings, investments) => {
   const {userId, firstName, lastName, date} = investments[0]
 
@@ -49,7 +46,6 @@ const generateCSVData = (userHoldings, investments) => {
   }))
 }
 
-// Generate CSV report for a specific user
 app.get("/generate/:userId", async (req, res) => {
   const {userId} = req.params
 
