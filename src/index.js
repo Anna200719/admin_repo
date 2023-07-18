@@ -8,43 +8,60 @@ const app = express()
 
 app.use(bodyParser.json({limit: "10mb"}))
 
+// Utility function to calculate the holding value
+const calculateHoldingValue = (investmentTotal, investmentPercentage) => {
+  return investmentTotal * investmentPercentage
+}
+
+// Utility function to aggregate user holdings
+const aggregateUserHoldings = (investments, companies, userId) => {
+  const userHoldings = {}
+
+  for (const investment of investments) {
+    if (investment.userId === userId) {
+      for (const holding of investment.holdings) {
+        const company = companies.find((company) => company.id === holding.id)
+        const holdingValue = calculateHoldingValue(investment.investmentTotal, holding.investmentPercentage)
+
+        if (userHoldings[company.name]) {
+          userHoldings[company.name] += holdingValue
+        } else {
+          userHoldings[company.name] = holdingValue
+        }
+      }
+    }
+  }
+
+  return userHoldings
+}
+
+// Generate CSV data from user holdings
+const generateCSVData = (userHoldings, investments) => {
+  const {userId, firstName, lastName, date} = investments[0]
+
+  return Object.entries(userHoldings).map(([holding, value]) => ({
+    User: userId,
+    "First Name": firstName,
+    "Last Name": lastName,
+    Date: date,
+    Holding: holding,
+    Value: value.toFixed(2),
+  }))
+}
+
 // Generate CSV report for a specific user
-// eslint-disable-next-line max-statements
 app.get("/generate/:userId", async (req, res) => {
   const {userId} = req.params
 
   try {
     const investmentsResponse = await axios.get(`${config.get("investmentsServiceUrl")}/investments`)
-    const investments = investmentsResponse.data
+    const investmentsData = investmentsResponse.data
 
     const companiesResponse = await axios.get(`${config.get("financialCompaniesServiceUrl")}/companies`)
-    const companies = companiesResponse.data
+    const companiesData = companiesResponse.data
 
-    const userHoldings = {}
-
-    for (const investment of investments) {
-      if (investment.userId === userId) {
-        for (const holding of investment.holdings) {
-          const company = companies.find((c) => c.id === holding.id)
-          const holdingValue = investment.investmentTotal * holding.investmentPercentage
-
-          if (userHoldings[company.name]) {
-            userHoldings[company.name] += holdingValue
-          } else {
-            userHoldings[company.name] = holdingValue
-          }
-        }
-      }
-    }
-
-    const csvData = Object.entries(userHoldings).map(([holding, value]) => ({
-      User: userId,
-      "First Name": investments[0].firstName,
-      "Last Name": investments[0].lastName,
-      Date: investments[0].date,
-      Holding: holding,
-      Value: value.toFixed(2),
-    }))
+    const userHoldings = aggregateUserHoldings(investmentsData, companiesData, userId)
+    const csvData = generateCSVData(userHoldings, investmentsData)
 
     const csvWriter = createObjectCsvWriter({
       path: "report.csv",
@@ -71,10 +88,11 @@ app.get("/generate/:userId", async (req, res) => {
   }
 })
 
-app.listen(config.get("port"), (err) => {
+const port = config.get("port")
+app.listen(port, (err) => {
   if (err) {
     console.error("Error occurred starting the server", err)
     process.exit(1)
   }
-  console.log(`Server running on port ${config.get("port")}`)
+  console.log(`Server running on port ${port}`)
 })
